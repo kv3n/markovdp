@@ -56,38 +56,41 @@ class Simulator:
             elif new_col < 0 or new_col >= self.grid_size:
                 new_row = cur_row
                 new_col = cur_col
+            elif self.policy[new_row][new_col] == 'N':
+                new_row = cur_row
+                new_col = cur_col
 
             cur_row = new_row
             cur_col = new_col
 
             money_made += action['cost']
-
             cur_policy = self.policy[cur_row][cur_col]
 
-            if cur_policy == 'N':
-                cur_row = row
-                cur_col = col
-                path = []
-
         path.append((cur_row, cur_col))
-        money_made += self.solver.state[(cur_row, cur_col)]
+        money_made += self.solver.boardA[(cur_row, cur_col)]
 
         return money_made, path
 
-    def run_simulation(self):
-        for row in xrange(self.grid_size):
-            for col in xrange(self.grid_size):
-                if self.policy[row][col] == 'N':
-                    continue
+    def run_simulation(self, num_times):
+        while num_times > 0:
+            for row in xrange(self.grid_size):
+                for col in xrange(self.grid_size):
+                    if self.policy[row][col] == 'N':
+                        continue
 
-                money_made, path = self.start_at(row, col)
-                print_color = bcolors.FAIL if money_made <= 0.0 else bcolors.OKGREEN
-                print(print_color + 'Made {} at {}, {} using {}'.format(money_made, row, col, path) + bcolors.ENDC)
+                    money_made, path = self.start_at(row, col)
+                    print_color = bcolors.FAIL if money_made <= 0.0 else bcolors.OKGREEN
+                    print(print_color + 'Made {} at {}, {} using {}'.format(money_made, row, col, path) + bcolors.ENDC)
+
+            num_times -= 1
 
 
 def main():
-    simulator = Simulator(2)
-    simulator.run_simulation()
+    simulator = Simulator(3)
+    print(simulator.policy[73][74])
+    print(simulator.policy[72][73])
+
+    #simulator.run_simulation(num_times=20)
 
 
 if __name__ == '__main__':
