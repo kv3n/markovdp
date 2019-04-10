@@ -34,7 +34,7 @@ class Config:
                 col = int(row_col_reward[1]) - 1
 
                 self.BlockOfInterest.add((row, col))
-                self.CashGrids[(row, col)] = int(row_col_reward[2])
+                self.CashGrids[(row, col)] = float(row_col_reward[2])
                 index += 1
 
             # Get Probability of Move
@@ -53,78 +53,78 @@ class Config:
 
 class MDPSolver:
     def __init__(self, input_file, max_time):
-        self.config = Config(input_file)
+        config = Config(input_file)
         self.action_space = {
             'U': {
-                'cost': self.config.MovementReward,
+                'cost': config.MovementReward,
                 'dir_row': -1,
                 'dir_col': 0,
-                'p': self.config.ProbabilityOfMove,
+                'p': config.ProbabilityOfMove,
                 'pretty': u'\u2191',
                 'other':
                     [{
                         'dir_row': -1,
                         'dir_col': -1,
-                        'p': self.config.ProbabilityOfOtherMove
+                        'p': config.ProbabilityOfOtherMove
                     },
                         {
                             'dir_row': -1,
                             'dir_col': 1,
-                            'p': self.config.ProbabilityOfOtherMove
+                            'p': config.ProbabilityOfOtherMove
                         }]
             },
             'D': {
-                'cost': self.config.MovementReward,
+                'cost': config.MovementReward,
                 'dir_row': 1,
                 'dir_col': 0,
-                'p': self.config.ProbabilityOfMove,
+                'p': config.ProbabilityOfMove,
                 'pretty': u'\u2193',
                 'other':
                     [{
                         'dir_row': 1,
                         'dir_col': 1,
-                        'p': self.config.ProbabilityOfOtherMove
+                        'p': config.ProbabilityOfOtherMove
                     },
                         {
                             'dir_row': 1,
                             'dir_col': -1,
-                            'p': self.config.ProbabilityOfOtherMove
+                            'p': config.ProbabilityOfOtherMove
                         }]
             },
             'L': {
-                'cost': self.config.MovementReward,
+                'cost': config.MovementReward,
                 'dir_row': 0,
                 'dir_col': -1,
-                'p': self.config.ProbabilityOfMove,
+                'p': config.ProbabilityOfMove,
                 'pretty': u'\u2190',
                 'other':
                     [{
                         'dir_row': 1,
                         'dir_col': -1,
-                        'p': self.config.ProbabilityOfOtherMove
+                        'p': config.ProbabilityOfOtherMove
                     },
                         {
                             'dir_row': -1,
                             'dir_col': -1,
-                            'p': self.config.ProbabilityOfOtherMove
+                            'p': config.ProbabilityOfOtherMove
                         }]
             },
             'R': {
-                'cost': self.config.MovementReward,
+                'cost': config.MovementReward,
                 'dir_row': 0,
                 'dir_col': 1,
-                'p': self.config.ProbabilityOfMove,
+                'p': config.ProbabilityOfMove,
                 'pretty': u'\u2192',
                 'other':
                     [{
                         'dir_row': -1,
                         'dir_col': 1,
-                        'p': self.config.ProbabilityOfOtherMove
+                        'p': config.ProbabilityOfOtherMove
                     },
                         {
                             'dir_row': 1,
                             'dir_col': 1,
-                            'p': self.config.ProbabilityOfOtherMove
+                            'p': config.ProbabilityOfOtherMove
                         }]
             },
             'E': {
@@ -147,15 +147,16 @@ class MDPSolver:
 
         self.performable_actions = ['U', 'D', 'R', 'L']
 
-        self.grid_size = self.config.GridSize
-        boi = self.config.BlockOfInterest
-        cash = self.config.CashGrids
+        self.grid_size = config.GridSize
+        boi = config.BlockOfInterest
+        self.cash = config.CashGrids
+        self.movement_rewards = config.MovementReward
+        self.discount = config.Discount
 
         self.boardA = dict()
         self.boardB = dict()
 
         self.policy = dict()
-        self.reward = dict()
 
         for row in xrange(self.grid_size):
             for col in xrange(self.grid_size):
@@ -165,78 +166,69 @@ class MDPSolver:
                     self.boardA[key] = 0.0
                     self.boardB[key] = 0.0
                 else:
-                    if key in cash:
+                    if key in self.cash:
                         self.policy[key] = 'E'
-                        self.boardA[key] = float(cash[key])
-                        self.boardB[key] = float(cash[key])
 
         self.end_time = time.time() + max_time
 
-        self.update = self.update_all_actions
-
-    def get_value_at(self, nr, nc, r, c, prob, board):
-        value = board.get((nr, nc), board[(r, c)])
-
-        return prob * value
-
-    def get_reward_and_value(self, row, col, move, board):
+    def get_reward_and_value(self, r, c, move):
         action = self.action_space[move]
+        board = self.boardA
+        cash = self.cash
 
-        utility_val = self.get_value_at(nr=row + action['dir_row'],
-                                        nc=col + action['dir_col'],
-                                        r=row,
-                                        c=col,
-                                        prob=action['p'],
-                                        board=board)
+        nr = r + action['dir_row']
+        nc = c + action['dir_col']
+        prob = action['p']
+        utility_val = prob * board.get((nr, nc),
+                                       cash.get((nr, nc),
+                                                board[r, c]))
 
-        for other in action['other']:
-            utility_val += self.get_value_at(nr=row + other['dir_row'],
-                                             nc=col + other['dir_col'],
-                                             r=row,
-                                             c=col,
-                                             prob=other['p'],
-                                             board=board)
+        other = action['other'][0]
+        nr = r + other['dir_row']
+        nc = c + other['dir_col']
+        prob = other['p']
+        utility_val += prob * board.get((nr, nc),
+                                        cash.get((nr, nc),
+                                                 board[r, c]))
 
-        final_val = utility_val
+        other = action['other'][1]
+        nr = r + other['dir_row']
+        nc = c + other['dir_col']
+        prob = other['p']
+        utility_val += prob * board.get((nr, nc),
+                                        cash.get((nr, nc),
+                                                 board[r, c]))
 
-        return final_val
+        return utility_val
 
-    def update_all_actions(self, row, col, board):
-        reward_values = [self.get_reward_and_value(row, col, move, board) for move in self.performable_actions]
+    def update(self, row, col):
+        reward_values = [(self.get_reward_and_value(row, col, move), move) for move in self.performable_actions]
+        max_reward, max_reward_dir = max(reward_values)
 
-        max_reward = max(reward_values)
-        maxes = [self.performable_actions[idx] for idx, val in enumerate(reward_values) if val == max_reward]
-        max_reward_dir = maxes[0]
-
-        computed_reward = self.config.MovementReward + self.config.Discount * max_reward
+        computed_reward = self.movement_rewards + self.discount * max_reward
         return computed_reward, max_reward_dir
 
-    def do_iteration(self, use_board, update_board):
-        converged = True
-        for row, col in use_board:
-            key = (row, col)
-            if key in self.config.CashGrids:
-                continue
-
-            cur_value = use_board[key]
-            new_value, action = self.update(row, col, use_board)
+    def do_iteration(self):
+        for key, value in self.boardA.iteritems():
+            row, col = key
+            new_value, action = self.update(row, col)
             self.policy[key] = action
-            update_board[key] = new_value
-
-            if converged and abs(cur_value - new_value) > 0.0:
-                converged = False
-
-        return converged
+            self.boardB[key] = new_value
 
     def solve(self):
-        use_board = self.boardA
-        update_board = self.boardB
+        #iterations = 0
+        #sum_time = 0.0
         while time.time() <= self.end_time:
-            if self.do_iteration(use_board, update_board):
-                # print('Converged with {} seconds left'.format(self.end_time - time.time()))
-                break
+            #start = time.time()
+            self.do_iteration()
+            self.boardA, self.boardB = self.boardB, self.boardA
+            #end = time.time()
 
-            use_board, update_board = update_board, use_board
+            #print('Took {}'.format(end - start))
+            #sum_time += (end - start)
+            #iterations += 1
+
+        #print('Average: {}'.format(sum_time / iterations))
 
     def __repr__(self):
         return self.__str__()
@@ -247,10 +239,7 @@ class MDPSolver:
             row_str = ''
             for col in xrange(self.grid_size):
                 action = self.policy[(row, col)]
-                if action == 'N':
-                    row_str += 'X '
-                else:
-                    row_str += self.action_space[action]['pretty'] + ' '
+                row_str += self.action_space[action]['pretty'] + ' '
 
             full_str += row_str + '\n'
 
@@ -274,11 +263,11 @@ class MDPSolver:
 
 
 def main():
-    solver = MDPSolver('input', 25.0)
+    solver = MDPSolver('input3', 25.0)
 
     solver.solve()
-    solver.write_out('output')
-    # print(unicode(solver))
+    solver.write_out('output3')
+    #print(unicode(solver))
 
 
 if __name__ == '__main__':
