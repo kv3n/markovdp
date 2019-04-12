@@ -5,10 +5,7 @@ import random
 class Treasure:
     def __init__(self, value, prob, other_prob):
         self.policy = 'E'
-        self.utility = {
-            False: [prob * value, other_prob * value],
-            True: [prob * value, other_prob * value]
-        }
+        self.utility = [prob * value, other_prob * value]
 
 
 class Wall:
@@ -30,27 +27,26 @@ class Location:
         self.actions.append([None, None, None])  # 'R'
 
         utility_at_value = random.uniform(0.0, max_payout)
-        self.utility = {
-            False: [prob * utility_at_value, other_prob * utility_at_value],
-            True: [prob * utility_at_value, other_prob * utility_at_value]
-        }
+        self.utility = [prob * utility_at_value, other_prob * utility_at_value]
         self.policy = 'N'
 
-    def do_update(self, bit, anti):
+    def do_update(self):
         a = self.actions
 
-        utilities = [(a[0][0][bit][0] + a[0][1][bit][1] + a[0][2][bit][1], 'U'),
-                     (a[1][0][bit][0] + a[1][1][bit][1] + a[1][2][bit][1], 'D'),
-                     (a[2][0][bit][0] + a[2][1][bit][1] + a[2][2][bit][1], 'L'),
-                     (a[3][0][bit][0] + a[3][1][bit][1] + a[3][2][bit][1], 'R')]
+        utilities = [(a[0][0][0] + a[0][1][1] + a[0][2][1], 'U'),
+                     (a[1][0][0] + a[1][1][1] + a[1][2][1], 'D'),
+                     (a[2][0][0] + a[2][1][1] + a[2][2][1], 'L'),
+                     (a[3][0][0] + a[3][1][1] + a[3][2][1], 'R')]
 
         max_utility, self.policy = max(utilities)
         max_utility = self.movement_reward + self.discount * max_utility
 
-        self.utility[anti][0] = self.prob * max_utility
-        self.utility[anti][1] = self.other_prob * max_utility
+        cur_utility = self.utility[0]
 
-        return False  # abs(self.utility[anti][0] - self.utility[bit][0]) < 0.00001
+        self.utility[0] = self.prob * max_utility
+        self.utility[1] = self.other_prob * max_utility
+
+        return abs(self.utility[0] - cur_utility) < 0.00001
 
 
 def read_file(input_file):
@@ -185,24 +181,36 @@ class MDPSolver:
         self.updating_board = list(board.values())
 
     def solve(self):
+        num_updating_boards = len(self.updating_board)
+        min_batching = int(self.grid_size * 0.75)
+        max_batching = int(self.grid_size * 1.25)
+        end_index = num_updating_boards - min_batching
         iterations = 0
-
-        bit = False
-        anti = not bit
+        converge_times = 0
 
         start = time.time()
         while time.time() <= self.end_time:
+            if iterations % num_updating_boards == 0:
+                print('Shuffled')
+                random.shuffle(self.updating_board)
+
             converged = True
-            for location in self.updating_board:
-                converged = converged & location.do_update(bit, anti)
+            start_idx = random.randint(0, end_index)
+            cur_batching = random.randint(min_batching, max_batching)
+            for location in self.updating_board[start_idx:start_idx+cur_batching]:
+                converged = converged & location.do_update()
+                location.do_update()
 
             if converged:
-                break
-
-            bit = not bit
-            anti = not bit
+                converge_times += 1
+                if converge_times > 10:
+                    print('Converged')
+                    break
+            else:
+                converge_times = 0
 
             iterations += 1
+
         end = time.time()
 
         print('Average: {} over {} iterations'.format((end - start) / iterations, iterations))
@@ -250,10 +258,10 @@ class MDPSolver:
 
 
 def main():
-    solver = MDPSolver('input3', 28.0)
+    solver = MDPSolver('input', 28.0)
 
     solver.solve()
-    solver.write_out('output3')
+    solver.write_out('output')
     print(unicode(solver))
 
 
