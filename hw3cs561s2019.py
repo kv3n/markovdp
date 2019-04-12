@@ -17,7 +17,7 @@ class Wall:
 
 
 class Location:
-    def __init__(self, prob, other_prob, movement_reward, discount):
+    def __init__(self, prob, other_prob, movement_reward, discount, max_payout):
         self.prob = prob
         self.other_prob = other_prob
         self.movement_reward = movement_reward
@@ -29,9 +29,10 @@ class Location:
         self.actions.append([None, None, None])  # 'L'
         self.actions.append([None, None, None])  # 'R'
 
+        utility_at_value = random.uniform(0.0, max_payout)
         self.utility = {
-            False: [prob * 0.0, other_prob * 0.0],
-            True: [prob * 0.0, other_prob * 0.0]
+            False: [prob * utility_at_value, other_prob * utility_at_value],
+            True: [prob * utility_at_value, other_prob * utility_at_value]
         }
         self.policy = 'N'
 
@@ -49,10 +50,14 @@ class Location:
         self.utility[anti][0] = self.prob * max_utility
         self.utility[anti][1] = self.other_prob * max_utility
 
+        return False  # abs(self.utility[anti][0] - self.utility[bit][0]) < 0.00001
+
 
 def read_file(input_file):
     cashes = dict()
     walls = dict()
+
+    max_payout = 0.0
 
     with open(input_file + '.txt', 'rU') as fp:
         lines = fp.readlines()
@@ -84,9 +89,12 @@ def read_file(input_file):
             row_col_reward = lines[index].split(',')
             row = int(row_col_reward[0]) - 1
             col = int(row_col_reward[1]) - 1
+            payout = float(row_col_reward[2])
 
-            cashes[(row, col)] = Treasure(float(row_col_reward[2]), prob, other_prob)
+            cashes[(row, col)] = Treasure(payout, prob, other_prob)
             index += 1
+
+            max_payout = max(max_payout, payout)
 
         # We already fetched prob and other prob. So move iterator
         index += 1
@@ -99,7 +107,7 @@ def read_file(input_file):
         discount = float(lines[index])
         index += 1
 
-    return grid_size, cashes, walls, reward, discount, prob, other_prob
+    return grid_size, cashes, walls, reward, discount, prob, other_prob, max_payout
 
 
 class MDPSolver:
@@ -107,7 +115,7 @@ class MDPSolver:
         self.start_time = time.time()
         self.end_time = self.start_time + max_time
 
-        self.grid_size, self.cashes, self.walls, reward, discount, prob, other_prob = read_file(input_file)
+        self.grid_size, self.cashes, self.walls, reward, discount, prob, other_prob, max_payout = read_file(input_file)
 
         board = dict()
 
@@ -115,7 +123,7 @@ class MDPSolver:
             for col in xrange(self.grid_size):
                 key = (row, col)
                 if key not in self.cashes and key not in self.walls:
-                    board[key] = Location(prob, other_prob, reward, discount)
+                    board[key] = Location(prob, other_prob, reward, discount, max_payout)
 
         # Cache locations
         for key, location in board.iteritems():
@@ -178,27 +186,26 @@ class MDPSolver:
 
     def solve(self):
         iterations = 0
-        sum_time = 0.0
 
         bit = False
         anti = not bit
-        while time.time() <= self.end_time:
-            start = time.time()
 
+        start = time.time()
+        while time.time() <= self.end_time:
+            converged = True
             for location in self.updating_board:
-                location.do_update(bit, anti)
+                converged = converged & location.do_update(bit, anti)
+
+            if converged:
+                break
 
             bit = not bit
             anti = not bit
 
-            end = time.time()
-
-            print('Took {}'.format(end - start))
-
-            sum_time += (end - start)
             iterations += 1
+        end = time.time()
 
-        print('Average: {} over {} iterations'.format(sum_time / iterations, iterations))
+        print('Average: {} over {} iterations'.format((end - start) / iterations, iterations))
 
     def __repr__(self):
         return self.__str__()
