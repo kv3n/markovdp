@@ -3,9 +3,7 @@ import random
 
 
 class Treasure:
-    def __init__(self, row, col, value, prob, other_prob):
-        self.row = row
-        self.col = col
+    def __init__(self, value, prob, other_prob):
         self.policy = 'E'
         self.utility = {
             False: [prob * value, other_prob * value],
@@ -14,17 +12,12 @@ class Treasure:
 
 
 class Wall:
-    def __init__(self, row, col):
-        self.row = row
-        self.col = col
+    def __init__(self):
         self.policy = 'N'
 
 
 class Location:
-    def __init__(self, row, col, prob, other_prob, movement_reward, discount):
-        self.row = row
-        self.col = col
-
+    def __init__(self, prob, other_prob, movement_reward, discount):
         self.prob = prob
         self.other_prob = other_prob
         self.movement_reward = movement_reward
@@ -76,7 +69,7 @@ def read_file(input_file):
             row = int(row_col[0]) - 1
             col = int(row_col[1]) - 1
 
-            walls[(row, col)] = Wall(row, col)
+            walls[(row, col)] = Wall()
             index += 1
 
         # Process Cash Grids
@@ -92,7 +85,7 @@ def read_file(input_file):
             row = int(row_col_reward[0]) - 1
             col = int(row_col_reward[1]) - 1
 
-            cashes[(row, col)] = Treasure(row, col, float(row_col_reward[2]), prob, other_prob)
+            cashes[(row, col)] = Treasure(float(row_col_reward[2]), prob, other_prob)
             index += 1
 
         # We already fetched prob and other prob. So move iterator
@@ -122,7 +115,7 @@ class MDPSolver:
             for col in xrange(self.grid_size):
                 key = (row, col)
                 if key not in self.cashes and key not in self.walls:
-                    board[key] = Location(row, col, prob, other_prob, reward, discount)
+                    board[key] = Location(prob, other_prob, reward, discount)
 
         # Cache locations
         for key, location in board.iteritems():
@@ -250,10 +243,10 @@ class MDPSolver:
 
 
 def main():
-    solver = MDPSolver('input5', 28.0)
+    solver = MDPSolver('input3', 28.0)
 
     solver.solve()
-    solver.write_out('output5')
+    solver.write_out('output3')
     print(unicode(solver))
 
 
