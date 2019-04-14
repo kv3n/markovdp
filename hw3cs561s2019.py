@@ -1,6 +1,13 @@
 import time
 import random
 
+index_to_actions_map = ['U', 'D', 'L', 'R']
+actions_to_index_map = {
+    'U': 0,
+    'D': 1,
+    'L': 2,
+    'R': 3
+}
 
 class Treasure:
     def __init__(self, value, prob, other_prob):
@@ -20,15 +27,11 @@ class Location:
         self.movement_reward = movement_reward
         self.discount = discount
 
-        self.actions = []
-        self.actions.append([None, None, None])  # 'U'
-        self.actions.append([None, None, None])  # 'D'
-        self.actions.append([None, None, None])  # 'L'
-        self.actions.append([None, None, None])  # 'R'
-
-        utility_at_value = random.uniform(0.0, max_payout)
-        self.utility = [prob * utility_at_value, other_prob * utility_at_value]
-        self.policy = 'N'
+        # Actions: U D L R
+        self.actions = [[None, None, None], [None, None, None], [None, None, None], [None, None, None]]
+        
+        self.utility = [0.0, 0.0]
+        self.policy = random.choice(index_to_actions_map)
 
     def do_update(self):
         a = self.actions
@@ -47,6 +50,13 @@ class Location:
         self.utility[1] = self.other_prob * max_utility
 
         return abs(self.utility[0] - cur_utility) < 0.00001
+    
+    def do_evaluate(self):
+        a = self.actions[actions_to_index_map[self.policy]]
+        random_policy_utility = a[0][0] + a[1][1] + a[2][1]
+        
+        self.utility[0] = self.prob * random_policy_utility
+        self.utility[1] = self.other_prob * random_policy_utility
 
 
 def read_file(input_file):
@@ -179,6 +189,11 @@ class MDPSolver:
 
         self.resting_board = board
         self.updating_board = list(board.values())
+    
+    def evaulate(self, times):
+        for _ in xrange(times):
+            for location in self.updating_board:
+                location.evaluate()
 
     def solve(self):
         num_updating_boards = len(self.updating_board)
@@ -189,6 +204,11 @@ class MDPSolver:
         converge_times = 0
 
         start = time.time()
+        
+        # Evaluate k times
+        self.evaluate(times=2)
+        
+        # Run random subset based iteration
         while time.time() <= self.end_time:
             if iterations % num_updating_boards == 0:
                 print('Shuffled')
