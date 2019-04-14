@@ -190,7 +190,7 @@ class MDPSolver:
         self.resting_board = board
         self.updating_board = list(board.values())
     
-    def evaulate(self, times):
+    def evaluate(self, times):
         for _ in xrange(times):
             for location in self.updating_board:
                 location.evaluate()
