@@ -51,7 +51,7 @@ class Location:
 
         return abs(self.utility[0] - cur_utility) < 0.00001
     
-    def do_evaluate(self):
+    def evaluate(self):
         a = self.actions[actions_to_index_map[self.policy]]
         random_policy_utility = a[0][0] + a[1][1] + a[2][1]
         
